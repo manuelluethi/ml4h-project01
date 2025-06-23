@@ -14,7 +14,10 @@
 # ---
 
 # %% [markdown]
-# # Tasks performed in this notebook
+# # Data preparation
+# This notebook performs some basic data preparation. It saves a transformed version of the time series data in the folder "data" contained in the root directory. We also copy the outcome data to the same folder. Later on, we only work with data contained in there.
+#
+# ## Tasks performed in this notebook
 # * Read raw data
 # * Transform to time-series data per individual in long format
 # * Normalize time-points to hourly values
@@ -25,10 +28,18 @@
 # Import dependencies
 import pandas as pd
 import os
+import re
 import shutil
 import logging
 from tqdm import tqdm
 
+
+# %%
+# Important directories
+THIS_DIR = os.getcwd()
+ROOT_DIR = os.path.dirname(THIS_DIR)
+DATA_DIR = os.path.join(ROOT_DIR, 'data')
+LOG_DIR = os.path.join(ROOT_DIR, 'logs')
 
 # %%
 # Setup logging
@@ -42,11 +53,13 @@ if logger.hasHandlers():
 
 if not logger.hasHandlers():
     # Create a directory for logs if it doesn't exist
-    log_dir = os.path.join(os.path.dirname(os.getcwd()), 'logs')
-    os.makedirs(log_dir, exist_ok=True)
+    try:
+        os.mkdir(LOG_DIR)
+    except FileExistsError:
+        pass
 
     # Create a file handler
-    log_file = os.path.join(log_dir, 'data-preparation.log')
+    log_file = os.path.join(LOG_DIR, 'data-preparation.log')
     fh = logging.FileHandler(log_file, mode='w')
     fh.setLevel(logging.DEBUG)
 
@@ -114,21 +127,27 @@ LOG_ZERO_OFFSET = 1e-6
 
 # %%
 # Fix path for data
-DATA_PATH = os.path.join(os.path.dirname(os.getcwd()),
-                         "physionet.org/files/challenge-2012/1.0.0/")
-DATA_TRAINING = os.path.join(DATA_PATH, "set-a")
-DATA_VALIDATION = os.path.join(DATA_PATH, "set-b")
-DATA_TESTING = os.path.join(DATA_PATH, "set-c")
-dataPaths = [DATA_TRAINING, DATA_VALIDATION, DATA_TESTING]
+ORIG_DATA_PATH = os.path.join(
+    ROOT_DIR,
+    "physionet.org/files/challenge-2012/1.0.0/"
+)
+ORIG_DATA_TRAINING = os.path.join(ORIG_DATA_PATH, "set-a")
+ORIG_DATA_VALIDATION = os.path.join(ORIG_DATA_PATH, "set-b")
+ORIG_DATA_TESTING = os.path.join(ORIG_DATA_PATH, "set-c")
+rawDataPaths = [
+    ORIG_DATA_TRAINING,
+    ORIG_DATA_VALIDATION,
+    ORIG_DATA_TESTING
+]
 
 # if we want to run the code on a test subset, generate test data
 if test:
-    for dataPath in dataPaths:
+    for rawDataPath in rawDataPaths:
         try:
-            newFolder = dataPath + "-test"
+            newFolder = rawDataPath + "-test"
             os.mkdir(newFolder)
             i = 0
-            for entry in os.scandir(dataPath):
+            for entry in os.scandir(rawDataPath):
                 if i < 100 and entry.name.endswith(".txt"):
                     i += 1
                     newPath = os.path.join(newFolder, entry.name)
@@ -136,11 +155,22 @@ if test:
         except FileExistsError:
             logger.info(
                 "Test data folder "
-                f"{os.path.basename(os.path.normpath(dataPath))}-test "
+                f"{os.path.basename(os.path.normpath(rawDataPath))}-test "
                 "already exists. Using existing data."
             )
             pass
-    dataPaths = [p + "-test" for p in dataPaths]
+    rawDataPaths = [p + "-test" for p in rawDataPaths]
+
+# Outcomes are already in one .txt-file (comma separated) per set. We save 
+# the file names
+ORIG_OUTCOME_TRAINING = os.path.join(ORIG_DATA_PATH, "Outcomes-a.txt")
+ORIG_OUTCOME_VALIDATION = os.path.join(ORIG_DATA_PATH, "Outcomes-b.txt")
+ORIG_OUTCOME_TESTING = os.path.join(ORIG_DATA_PATH, "Outcomes-c.txt")
+rawOutcomesPaths = [
+    ORIG_OUTCOME_TRAINING, 
+    ORIG_OUTCOME_VALIDATION, 
+    ORIG_OUTCOME_TESTING
+]
 
 
 # %%
@@ -271,9 +301,9 @@ def expandDataFrame(hour, timestamp, df):
 # Input:    - Path to an individual record's data
 # Output:   - a pandas.DataFrame with the time series data for this individual
 #             in long format with one row per hour
-def patientDataFrame(dataPath):
+def patientDataFrame(rawDataPath):
     df = initializeDataFrame()
-    data = open(dataPath)
+    data = open(rawDataPath)
     # first line is a header
     next(data)
     # read the remainder of the file line-by-line
@@ -282,7 +312,7 @@ def patientDataFrame(dataPath):
     # and fill up the rows later
     staticDict = initializeStaticDict()
     # now we parse the file line by line
-    fileName = os.path.basename(dataPath)
+    fileName = os.path.basename(rawDataPath)
     RecordID = ""
     # we keep track of the line number for logging purposes
     lineNumber = 1  # we ignore the header
@@ -337,32 +367,109 @@ def patientDataFrame(dataPath):
 # Input:    - dataPath = path to the folder containing the patient
 # Output:   - a pandas.DataFrame with the time series data for all patients
 #             in dataPath using long format with one row per hour
-def dataToLongFormat(dataPath):
+def rawDataToLongFormat(rawDataPath):
     df = initializeDataFrame()
-    for file in tqdm(os.listdir(dataPath)):
+    for file in tqdm(os.listdir(rawDataPath)):
         if file.endswith(".txt"):
             # Create a data frame for the patient
-            patient_df = patientDataFrame(os.path.join(dataPath, file))
+            patient_df = patientDataFrame(os.path.join(rawDataPath, file))
             # Add the patient data frame to the main data frame
             df = pd.concat([df, patient_df], ignore_index=True)
     return df
 
 
+# We process an outcomes file.
+# Essentially, we import the data as a pandas data frame, which we return.
+# If test=True, then we only keep the outcomes corresponding to patients
+# retained for the test sample. In particular, this uses the processed
+# input data as produced by rawDataToLongFormat
+# Input:    - rawOutcomesPath = Path to a file containing the original 
+#             outcome data
+#           - dataLongFormat = data frame as returned from rawDataToLongFormat
+def processOutcomes(rawOutcomesPath, dataLongFormat):
+    relevantRecords = dataLongFormat['RecordID'].unique()
+    dfOut = pd.read_csv(rawOutcomesPath)
+    # if test, we need to drop some entries
+    if test:
+        # for matching, we need to use RecordID as a string (which is the type)
+        # used in dataLongFormat
+        dfOut['RecordID'] = dfOut['RecordID'].astype(str)
+        # we only keep the relevant records
+        drop_indices = dfOut[~dfOut['RecordID'].isin(relevantRecords)].index
+        dfOut.drop(index=drop_indices, inplace=True)
+        if dfOut.empty:
+            logging.warning(
+                f"Processing of {rawOutcomesPath} resulted "
+                "in an empty data frame."
+            )
+    return dfOut
+
+
+# Before applying processOutcomeData, we need to determine the rawOutcomesPath 
+# corresponding to a given rawDataPath
+# the following two functions do exactly this
+# Input:    - rawDataPath = Path to the original input data being processed
+# Output:   - key = 'a', 'b', 'c' indicating training, validation, or test data
+def extractDataKey(rawDataPath):
+    # Extract 'VAL', e.g., 'a', 'b' 'c', from 'set-VAL' or 'set-VAL-test'
+    basename = os.path.basename(rawDataPath)
+    key = re.match(r'set-([^/-]+)(?:-test)?$', basename).group(1)
+    return key
+
+    
+# Input:    - rawDataPath = Path to the original input data being processed
+# Output:   - rawOutcomesPath = Path to the original file containing the outcomes
+#             corresponding to the input path
+def findOutcomes(rawDataPath):
+    key = extractDataKey(rawDataPath)
+    for rawOutcomePath in rawOutcomesPaths:
+        basename = os.path.basename(rawOutcomePath)
+        # Extract letter before .txt in Outcomes-?.txt
+        m = re.match(r'Outcomes-([a-zA-Z])\.txt$', basename)
+        if m and m.group(1) == key:
+            return rawOutcomePath
+
+
 # %%
+# Create a folder data in the root directory, which contains the
+# data we actually work with. In particular, the time series data in long
+# format, stored as parquet.gzip and the outcome data
+try:
+    os.mkdir(DATA_DIR)
+except:
+    pass
+
 # Transform data to frames in long format and save as parquet
 # We produce one data frame per set according to the split into
 # training, validation, and testing
-for dataPath in dataPaths:
+for rawDataPath in rawDataPaths:
     logger.info(
-        "Processing data in "
-        f"{os.path.basename(os.path.normpath(dataPath))}..."
+        "Processing raw data in "
+        f"{os.path.basename(os.path.normpath(rawDataPath))}..."
     )
     # Create the long format data frame
-    df = dataToLongFormat(dataPath)
-    # save data to parquet format
-    outputFileName = os.path.basename(dataPath) + "_long_format.parquet.gzip"
-    outputFilePath = os.path.join(dataPath, outputFileName)
-    df.to_parquet(outputFilePath, index=False)
-    logger.info(f"Saved {outputFileName} with {len(df)} rows.")
+    df = rawDataToLongFormat(rawDataPath)
+    # we define the file name, e.g., set-a.parquet.gzip, independent
+    # of whether test = True or test = False
+    rawDataName = os.path.basename(rawDataPath)
+    name = re.search(r'([^/]+?)(?:-test)?$', rawDataName).group(1)
+    outDataName = f"{name}.parquet.gzip"
+    outDataPath = os.path.join(DATA_DIR, outDataName)
+    # save long format data to parquet
+    df.to_parquet(outDataPath, index=False)
+    logger.info(
+        f"Saved {outDataName} to {os.path.basename(DATA_DIR)}."
+    )
+    # We process the corresponding outcomes
+    rawOutcomesPath = findOutcomes(rawDataPath)
+    dfOutcomes = processOutcomes(rawOutcomesPath, df)
+    # save outcomes data to parquet
+    outOutcomesName = f"{name}-outcomes.parquet.gzip"
+    outOutcomesPath = os.path.join(DATA_DIR, outOutcomesName)
+    dfOutcomes.to_parquet(outOutcomesPath, index=False)
+    logger.info(
+        f"Saved {outOutcomesName} to {os.path.basename(DATA_DIR)}."
+    )
+
 print("Data preparation completed successfully.")
 logger.info("Data preparation completed successfully.")
