@@ -15,7 +15,10 @@
 
 # %% [markdown]
 # # Data preparation
-# This notebook performs some basic data preparation. It saves a transformed version of the time series data in the folder "data" contained in the root directory. We also copy the outcome data to the same folder. Later on, we only work with data contained in there.
+# This notebook performs some basic data preparation. It saves a transformed
+# version of the time series data in the folder "data" contained in the root
+# directory. We also copy the outcome data to the same folder. Later on, we
+# only work with data contained in there.
 #
 # ## Tasks performed in this notebook
 # * Read raw data
@@ -161,14 +164,14 @@ if test:
             pass
     rawDataPaths = [p + "-test" for p in rawDataPaths]
 
-# Outcomes are already in one .txt-file (comma separated) per set. We save 
+# Outcomes are already in one .txt-file (comma separated) per set. We save
 # the file names
 ORIG_OUTCOME_TRAINING = os.path.join(ORIG_DATA_PATH, "Outcomes-a.txt")
 ORIG_OUTCOME_VALIDATION = os.path.join(ORIG_DATA_PATH, "Outcomes-b.txt")
 ORIG_OUTCOME_TESTING = os.path.join(ORIG_DATA_PATH, "Outcomes-c.txt")
 rawOutcomesPaths = [
-    ORIG_OUTCOME_TRAINING, 
-    ORIG_OUTCOME_VALIDATION, 
+    ORIG_OUTCOME_TRAINING,
+    ORIG_OUTCOME_VALIDATION,
     ORIG_OUTCOME_TESTING
 ]
 
@@ -383,7 +386,7 @@ def rawDataToLongFormat(rawDataPath):
 # If test=True, then we only keep the outcomes corresponding to patients
 # retained for the test sample. In particular, this uses the processed
 # input data as produced by rawDataToLongFormat
-# Input:    - rawOutcomesPath = Path to a file containing the original 
+# Input:    - rawOutcomesPath = Path to a file containing the original
 #             outcome data
 #           - dataLongFormat = data frame as returned from rawDataToLongFormat
 def processOutcomes(rawOutcomesPath, dataLongFormat):
@@ -391,8 +394,8 @@ def processOutcomes(rawOutcomesPath, dataLongFormat):
     dfOut = pd.read_csv(rawOutcomesPath)
     # if test, we need to drop some entries
     if test:
-        # for matching, we need to use RecordID as a string (which is the type)
-        # used in dataLongFormat
+        # for matching, we need to use RecordID as a string (which is the type
+        # used in dataLongFormat)
         dfOut['RecordID'] = dfOut['RecordID'].astype(str)
         # we only keep the relevant records
         drop_indices = dfOut[~dfOut['RecordID'].isin(relevantRecords)].index
@@ -405,7 +408,7 @@ def processOutcomes(rawOutcomesPath, dataLongFormat):
     return dfOut
 
 
-# Before applying processOutcomeData, we need to determine the rawOutcomesPath 
+# Before applying processOutcomeData, we need to determine the rawOutcomesPath
 # corresponding to a given rawDataPath
 # the following two functions do exactly this
 # Input:    - rawDataPath = Path to the original input data being processed
@@ -416,10 +419,10 @@ def extractDataKey(rawDataPath):
     key = re.match(r'set-([^/-]+)(?:-test)?$', basename).group(1)
     return key
 
-    
+
 # Input:    - rawDataPath = Path to the original input data being processed
-# Output:   - rawOutcomesPath = Path to the original file containing the outcomes
-#             corresponding to the input path
+# Output:   - rawOutcomesPath = Path to the original file containing the
+#             outcomes corresponding to the input path
 def findOutcomes(rawDataPath):
     key = extractDataKey(rawDataPath)
     for rawOutcomePath in rawOutcomesPaths:
