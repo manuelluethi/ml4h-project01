@@ -33,3 +33,4 @@ texput*
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+*predicting-*

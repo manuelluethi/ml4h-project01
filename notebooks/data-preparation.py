@@ -39,8 +39,24 @@ from tqdm import tqdm
 
 # %%
 # Important directories
-THIS_DIR = os.getcwd()
-ROOT_DIR = os.path.dirname(THIS_DIR)
+
+
+# We first obtain the root directory. The way this is done depends on whether
+# we run the python notebook or the associated .py file as a script.
+# Hence, we use a helper function
+def getRootFolder():
+    if '__file__' in globals():
+        projectRoot = os.path.dirname(
+            os.path.dirname(
+                os.path.abspath(__file__)
+            )
+        )
+    else:
+        projectRoot = os.path.dirname(os.getcwd())
+    return projectRoot
+
+
+ROOT_DIR = getRootFolder()
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 LOG_DIR = os.path.join(ROOT_DIR, 'logs')
 
@@ -124,15 +140,17 @@ TYPE_INTEGER = ['Hour']
 TYPE_CATEGORICAL = ['Gender']
 TYPE_FLOAT = (LIST_VARIABLE_TS + LIST_VARIABLE_STATIC).remove('Gender')
 
-# Fix a threshold for zero
-LOG_ZERO_OFFSET = 1e-6
-
 
 # %%
 # Fix path for data
 ORIG_DATA_PATH = os.path.join(
     ROOT_DIR,
-    "physionet.org/files/challenge-2012/1.0.0/"
+    os.path.join(
+        "predicting-mortality-of-icu-patients-the-physionetcomputing"
+        "-in-cardiology-challenge-2012-1.0.0",
+        "predicting-mortality-of-icu-patients-the-physionet-computing"
+        "-in-cardiology-challenge-2012-1.0.0"
+    )
 )
 ORIG_DATA_TRAINING = os.path.join(ORIG_DATA_PATH, "set-a")
 ORIG_DATA_VALIDATION = os.path.join(ORIG_DATA_PATH, "set-b")
@@ -439,7 +457,10 @@ def findOutcomes(rawDataPath):
 # format, stored as parquet.gzip and the outcome data
 try:
     os.mkdir(DATA_DIR)
-except:
+except FileExistsError:
+    logging.info(
+        f"{os.path.basename(DATA_DIR)} exists and won't be created"
+    )
     pass
 
 # Transform data to frames in long format and save as parquet
