@@ -366,3 +366,6 @@ for dataPath in dataPaths:
     logger.info(f"Saved {outputFileName} with {len(df)} rows.")
 print("Data preparation completed successfully.")
 logger.info("Data preparation completed successfully.")
+
+# %%
+print("5")
