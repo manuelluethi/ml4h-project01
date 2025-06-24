@@ -1,7 +1,6 @@
 # ---
 # jupyter:
 #   jupytext:
-#     formats: ipynb,py:percent
 #     text_representation:
 #       extension: .py
 #       format_name: percent
@@ -99,14 +98,6 @@ if not logger.hasHandlers():
 
 # %%
 # Preperations:
-# Boolean determining whether the script is run on the full data or
-# on a subset residing in subfolders with suffix -test
-# If the testdata doesn't exist, it will be created.
-# This is for debugging purposes only. The test data created is platform
-# dependent because of the use of os.scandir(), hence the results
-# are not reproducible.
-test = True
-
 # A list of all the time series variables to consider
 LIST_VARIABLE_TS = [
     'ALP', 'ALT', 'AST', 'Albumin', 'BUN', 'Bilirubin',
@@ -161,26 +152,24 @@ rawDataPaths = [
     ORIG_DATA_TESTING
 ]
 
-# if we want to run the code on a test subset, generate test data
-if test:
-    for rawDataPath in rawDataPaths:
-        try:
-            newFolder = rawDataPath + "-test"
-            os.mkdir(newFolder)
-            i = 0
-            for entry in os.scandir(rawDataPath):
-                if i < 100 and entry.name.endswith(".txt"):
-                    i += 1
-                    newPath = os.path.join(newFolder, entry.name)
-                    shutil.copy(entry.path, newPath)
-        except FileExistsError:
-            logger.info(
-                "Test data folder "
-                f"{os.path.basename(os.path.normpath(rawDataPath))}-test "
-                "already exists. Using existing data."
-            )
-            pass
-    rawDataPaths = [p + "-test" for p in rawDataPaths]
+# if it doesn't exist, generate test data
+for rawDataPath in rawDataPaths:
+    try:
+        newFolder = rawDataPath + "-test"
+        os.mkdir(newFolder)
+        i = 0
+        for entry in os.scandir(rawDataPath):
+            if i < 100 and entry.name.endswith(".txt"):
+                i += 1
+                newPath = os.path.join(newFolder, entry.name)
+                shutil.copy(entry.path, newPath)
+    except FileExistsError:
+        logger.info(
+            "Test data folder "
+            f"{os.path.basename(os.path.normpath(rawDataPath))}-test "
+            "already exists. Using existing data."
+        )
+        pass
 
 # Outcomes are already in one .txt-file (comma separated) per set. We save
 # the file names
@@ -407,11 +396,12 @@ def rawDataToLongFormat(rawDataPath):
 # Input:    - rawOutcomesPath = Path to a file containing the original
 #             outcome data
 #           - dataLongFormat = data frame as returned from rawDataToLongFormat
-def processOutcomes(rawOutcomesPath, dataLongFormat):
+#           - bTest = boolean indicating whether we process test data only
+def processOutcomes(rawOutcomesPath, dataLongFormat, bTest):
     relevantRecords = dataLongFormat['RecordID'].unique()
     dfOut = pd.read_csv(rawOutcomesPath)
     # if test, we need to drop some entries
-    if test:
+    if bTest:
         # for matching, we need to use RecordID as a string (which is the type
         # used in dataLongFormat)
         dfOut['RecordID'] = dfOut['RecordID'].astype(str)
@@ -452,48 +442,64 @@ def findOutcomes(rawDataPath):
 
 
 # %%
-# Create a folder data in the root directory, which contains the
-# data we actually work with. In particular, the time series data in long
-# format, stored as parquet.gzip and the outcome data
-try:
-    os.mkdir(DATA_DIR)
-except FileExistsError:
-    logging.info(
-        f"{os.path.basename(DATA_DIR)} exists and won't be created"
-    )
-    pass
+# We define the data preparation as a function. The function transforms
+# the data into long format for the predictors and saves the resulting data
+# frames in DATA_DIR.
+# Input:    - bTest = boolean indicating whether we only want to produce a test
+#             sample of data
+def dataPreparation(bTest):
+    # Create a folder data in the root directory, which contains the
+    # data we actually work with. In particular, the time series data in long
+    # format, stored as parquet.gzip and the outcome data
+    try:
+        os.mkdir(DATA_DIR)
+    except FileExistsError:
+        logging.info(
+            f"{os.path.basename(DATA_DIR)} exists and won't be created"
+        )
+        pass
+    if bTest:
+        rawDataPaths = [p + "-test" for p in rawDataPaths]
+    # Transform data to frames in long format and save as parquet
+    # We produce one data frame per set according to the split into
+    # training, validation, and testing
+    for rawDataPath in rawDataPaths:
+        logger.info(
+            "Processing raw data in "
+            f"{os.path.basename(os.path.normpath(rawDataPath))}..."
+        )
+        # Create the long format data frame
+        df = rawDataToLongFormat(rawDataPath)
+        # we define the file name, e.g., set-a.parquet.gzip, independent
+        # of whether test = True or test = False
+        rawDataName = os.path.basename(rawDataPath)
+        name = re.search(r'([^/]+?)(?:-test)?$', rawDataName).group(1)
+        outDataName = f"{name}.parquet.gzip"
+        outDataPath = os.path.join(DATA_DIR, outDataName)
+        # save long format data to parquet
+        df.to_parquet(outDataPath, index=False)
+        logger.info(
+            f"Saved {outDataName} to {os.path.basename(DATA_DIR)}."
+        )
+        # We process the corresponding outcomes
+        rawOutcomesPath = findOutcomes(rawDataPath)
+        dfOutcomes = processOutcomes(rawOutcomesPath, df)
+        # save outcomes data to parquet
+        outOutcomesName = f"{name}-outcomes.parquet.gzip"
+        outOutcomesPath = os.path.join(DATA_DIR, outOutcomesName)
+        dfOutcomes.to_parquet(outOutcomesPath, index=False)
+        logger.info(
+            f"Saved {outOutcomesName} to {os.path.basename(DATA_DIR)}."
+        )
 
-# Transform data to frames in long format and save as parquet
-# We produce one data frame per set according to the split into
-# training, validation, and testing
-for rawDataPath in rawDataPaths:
-    logger.info(
-        "Processing raw data in "
-        f"{os.path.basename(os.path.normpath(rawDataPath))}..."
-    )
-    # Create the long format data frame
-    df = rawDataToLongFormat(rawDataPath)
-    # we define the file name, e.g., set-a.parquet.gzip, independent
-    # of whether test = True or test = False
-    rawDataName = os.path.basename(rawDataPath)
-    name = re.search(r'([^/]+?)(?:-test)?$', rawDataName).group(1)
-    outDataName = f"{name}.parquet.gzip"
-    outDataPath = os.path.join(DATA_DIR, outDataName)
-    # save long format data to parquet
-    df.to_parquet(outDataPath, index=False)
-    logger.info(
-        f"Saved {outDataName} to {os.path.basename(DATA_DIR)}."
-    )
-    # We process the corresponding outcomes
-    rawOutcomesPath = findOutcomes(rawDataPath)
-    dfOutcomes = processOutcomes(rawOutcomesPath, df)
-    # save outcomes data to parquet
-    outOutcomesName = f"{name}-outcomes.parquet.gzip"
-    outOutcomesPath = os.path.join(DATA_DIR, outOutcomesName)
-    dfOutcomes.to_parquet(outOutcomesPath, index=False)
-    logger.info(
-        f"Saved {outOutcomesName} to {os.path.basename(DATA_DIR)}."
-    )
+    print("Data preparation completed successfully.")
+    logger.info("Data preparation completed successfully.")
 
-print("Data preparation completed successfully.")
-logger.info("Data preparation completed successfully.")
+# %% Markdown [markdown]
+# ## In order to produce the data
+# call ``dataPreparation(bTest)`` to create the data for further processing
+# with values ``bTest=True`` if you want to generate a set for testing
+# purposes and ``bTest=False`` if you want to process all data.
+
+# %% tags=["active-ipynb"]
+# dataPreparation(True)
