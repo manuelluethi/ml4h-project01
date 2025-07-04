@@ -1,7 +1,7 @@
 # ML4H Project
 This repository contains my approach to an exercise posed in the Machine 
-Learning for Health Care course at ETHZ in 2025. This is for exploratory 
-purposes only.
+Learning for Health Care course at ETHZ in 2025. This is ongoing work 
+and intended for exploratory purposes only.
 
 # Requirements
 It is assumed that the data has been downloaded in .zip format from 
