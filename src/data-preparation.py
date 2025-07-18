@@ -36,26 +36,18 @@ import logging
 from tqdm import tqdm
 
 
-# %%
-# Important directories
+# %% tags=["active-ipynb"]
+# # Important directories
+# ROOT_DIR = os.path.dirname(os.getcwd())
+# DATA_DIR = os.path.join(ROOT_DIR, 'data')
+# LOG_DIR = os.path.join(ROOT_DIR, 'logs')
 
-
-# We first obtain the root directory. The way this is done depends on whether
-# we run the python notebook or the associated .py file as a script.
-# Hence, we use a helper function
-def getRootFolder():
-    if '__file__' in globals():
-        projectRoot = os.path.dirname(
-            os.path.dirname(
-                os.path.abspath(__file__)
-            )
-        )
-    else:
-        projectRoot = os.path.dirname(os.getcwd())
-    return projectRoot
-
-
-ROOT_DIR = getRootFolder()
+# %% tags=["active-py"] jupyter={"source_hidden": true}
+# Only in command line mode:
+# os.getcwd() doesn't work if the script is run from the command line.
+# This does the same as above for CLI and isn't needed nor does it work in the
+# notebook.
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT_DIR, 'data')
 LOG_DIR = os.path.join(ROOT_DIR, 'logs')
 
@@ -495,7 +487,7 @@ def dataPreparation(bTest):
     print("Data preparation completed successfully.")
     logger.info("Data preparation completed successfully.")
 
-# %% Markdown [markdown]
+# %% [markdown]
 # ## In order to produce the data
 # call ``dataPreparation(bTest)`` to create the data for further processing
 # with values ``bTest=True`` if you want to generate a set for testing
