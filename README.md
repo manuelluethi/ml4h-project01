@@ -19,7 +19,7 @@ and model specifications. We will focus on the following four tasks.
   various simpler or more complicated models.
 - We view the time series as an element of $$\mathrm{L}^2[0,24]^p$$ with very
   irregular measurements (component-wise missingness). We use a functional data
-  analysis approach based on[1](#mahalanobis) to separate the conditional distribution of
+  analysis approach based on [1](#mahalanobis) to separate the conditional distribution of
   time-series viewed as random trajectories according to the ourcome. The 
   methods aren't directly applicable because of the irregular discretization. 
   Hence we have to carefully handle missingness for discretized curves.
