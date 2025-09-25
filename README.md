@@ -18,10 +18,11 @@ and model specifications. We will focus on the following four tasks.
   XGBoost&mdash;somewhat the state-of-the-art for tabular data&mdash;, LSTM, and
   various simpler or more complicated models.
 - We view the time series as an element of $$\mathrm{L}^2[0,24]^p$$ with very
-  irregular measurements (component-wise missingness). We attempt to us a
-  Mahalanobis distance approach based on [^1]. The methods aren't directly
-  applicable because of the irregular discretization. Hence we have to carefully
-  handle missingness for discretized curves.
+  irregular measurements (component-wise missingness). We use a functional data
+  analysis approach based on[^1] to separate the conditional distribution of
+  time-series viewed as random trajectories according to the ourcome. The 
+  methods aren't directly applicable because of the irregular discretization. 
+  Hence we have to carefully handle missingness for discretized curves.
 
 # Requirements
 It is assumed that the data has been downloaded in .zip format from 
@@ -35,3 +36,8 @@ for classical command line interaction. Jupytext is used to synchronize
 jupyter notebooks and the corresponding .py files. The configuration is
 contained in jupytext.toml and submitted to the repository for ease of
 use.
+
+# References
+[^1] N. Zozoulenko, Th. Cass, and L. Gonon. Infinite-dimensional Mahalanobis
+Distance with Applications to Kernelized Novelty Detection (2025), [https://arxiv.org/abs/2407.11873](arXiv).
+
