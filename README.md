@@ -39,5 +39,5 @@ use.
 
 # References
 [^1] N. Zozoulenko, Th. Cass, and L. Gonon. Infinite-dimensional Mahalanobis
-Distance with Applications to Kernelized Novelty Detection (2025), [https://arxiv.org/abs/2407.11873](arXiv).
+Distance with Applications to Kernelized Novelty Detection (2025), [arXiv](https://arxiv.org/abs/2407.11873).
 
