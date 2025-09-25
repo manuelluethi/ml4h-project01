@@ -4,7 +4,7 @@ Learning for Health Care course at ETHZ in 2025. This is ongoing work
 and intended for exploratory purposes only.
 
 ## The data and the goals
-We are given observations of multivariate time series (of, say, $$p$$ features)
+We are given observations of multivariate time series (of, say, $p$ features)
 corresponding to measurements of patient data over a 24 hour ICU stay together 
 with some outcomes, e.g., death vs. survival. The task in the exercise was to 
 train a model to predict the outcomes from the observed time series. The 
@@ -17,7 +17,7 @@ and model specifications. We will focus on the following four tasks.
   from hourly discretized data. Among others, we'll compare 
   XGBoost&mdash;somewhat the state-of-the-art for tabular data&mdash;, LSTM, and
   various simpler or more complicated models.
-- We view the time series as an element of $$\mathrm{L}^2[0,24]^p$$ with very
+- We view the time series as an element of $\mathrm{L}^2[0,24]^p$ with very
   irregular measurements (component-wise missingness). We use a functional data
   analysis approach based on [1](#mahalanobis) to separate the conditional distribution of
   time-series viewed as random trajectories according to the ourcome. The 
